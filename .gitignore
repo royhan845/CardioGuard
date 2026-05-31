@@ -1,0 +1,14 @@
+# Node & Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+
+# Python & Flask
+backend/__pycache__/
+backend/venv/
+backend/.venv/
+backend/instance/
+backend/*.db
+backend/*.sqlite3
