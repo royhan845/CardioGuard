@@ -73,15 +73,51 @@ def analyze_nlp():
     teks = data.get('keluhan_teks', '')
     nama = data.get('nama_pasien', 'Anonim')
     
-    # Proses Sastrawi
+    # 1. Preprocessing Sastrawi
     teks_bersih = stemmer.stem(stopword_remover.remove(teks.lower()))
+    kata_kata = teks_bersih.split()
+    
+    # 2. Kamus Gejala Medis Ekstensif (Ramah Pasien & Dokter)
     kamus_gejala = {
-        "Nyeri Dada": ["nyeri", "sakit", "tekan"], 
-        "Sesak Napas": ["sesak", "engap"],
-        "Palpitasi": ["debar", "kencang"]
+        "Nyeri/Dada Tertekan (Angina)": ["nyeri", "sakit", "tekan", "tindih", "berat", "panas", "tusuk", "remas"],
+        "Sesak Napas (Dyspnea)": ["sesak", "engap", "megap", "napas", "cekik", "pendek"],
+        "Jantung Berdebar (Palpitasi)": ["debar", "kencang", "loncat", "detak", "cepat"],
+        "Kelelahan Ekstrem / Pusing": ["lelah", "capek", "lemas", "loyo", "pingsan", "keringat", "dingin", "pusing"]
     }
-    gejala_terdeteksi = [g for g, s in kamus_gejala.items() if any(x in teks_bersih for x in s)]
-    gejala_string = ", ".join(gejala_terdeteksi) if gejala_terdeteksi else "Negatif"
+    
+    # 3. Kamus Negasi untuk mencegah salah deteksi
+    kata_negasi = ["tidak", "ndak", "enggak", "bukan", "tanpa", "kurang", "hilang"]
+    
+    gejala_terdeteksi = set()
+    
+    # 4. Logika Pencocokan Pintar (Smart Matching + Negation Check)
+    for i, kata in enumerate(kata_kata):
+        for kondisi, keywords in kamus_gejala.items():
+            if kata in keywords:
+                # Cek mundur maksimal 2 kata sebelumnya, apakah ada kata negasi?
+                is_negated = False
+                start_idx = max(0, i - 2)
+                for j in range(start_idx, i):
+                    if kata_kata[j] in kata_negasi:
+                        is_negated = True
+                        break
+                
+                # Jika tidak ada kata negasi di sekitarnya, masukkan sebagai gejala positif
+                if not is_negated:
+                    gejala_terdeteksi.add(kondisi)
+    
+    # 5. Penentuan Tingkat Urgensi (Sistem Triase Otomatis)
+    if "Nyeri/Dada Tertekan (Angina)" in gejala_terdeteksi or len(gejala_terdeteksi) >= 2:
+        tingkat_urgensi = "URGENSI TINGGI"
+    elif len(gejala_terdeteksi) == 1:
+        tingkat_urgensi = "URGENSI MENENGAH"
+    else:
+        tingkat_urgensi = "URGENSI RENDAH / AMAN"
+
+    gejala_string = ", ".join(gejala_terdeteksi) if gejala_terdeteksi else "Tidak ada gejala spesifik"
+    
+    # Format penyimpanan ke database agar muncul dengan rapi di dasbor Dokter
+    hasil_simpan = f"[{tingkat_urgensi}] {gejala_string}"
     
     # Simpan ke Database
     new_ticket = generate_ticket()
@@ -89,7 +125,7 @@ def analyze_nlp():
         ticket_code=new_ticket,
         nama_pasien=nama,
         keluhan_teks=teks,
-        gejala_nlp=gejala_string
+        gejala_nlp=hasil_simpan
     )
     db.session.add(rekam_baru)
     db.session.commit()
@@ -97,7 +133,8 @@ def analyze_nlp():
     return jsonify({
         "status": "success",
         "ticket_code": new_ticket,
-        "gejala_terdeteksi": gejala_terdeteksi,
+        "gejala_terdeteksi": list(gejala_terdeteksi),
+        "tingkat_urgensi": tingkat_urgensi,
         "nlp_log": teks_bersih
     })
 
@@ -146,8 +183,16 @@ def predict_ml():
     input_df = pd.get_dummies(input_df, columns=kolom_kategorik)
     input_df = input_df.reindex(columns=model_aktif.feature_names_in_, fill_value=0)
     
-    prediction = int(model_aktif.predict(input_df)[0])
-    probability = float(model_aktif.predict_proba(input_df)[0][1])
+    # =================================================================
+    # TRIK INVERT LOGIC (PERBAIKAN LABEL KAGGLE DATASET)
+    # Di dataset asli: Class 0 = Sakit Jantung, Class 1 = Sehat
+    # Kita ambil probabilitas khusus untuk Class 0 (index [0][0])
+    # =================================================================
+    probabilitas_sakit = float(model_aktif.predict_proba(input_df)[0][0])
+    
+    # Kita balik tebakannya agar masuk akal di dunia medis (1 = Positif, 0 = Negatif)
+    prediksi_final = 1 if probabilitas_sakit >= 0.5 else 0
+    # =================================================================
 
     # Update Data ke Database
     pasien.age = data['age']
@@ -163,16 +208,16 @@ def predict_ml():
     pasien.slope = data['slope']
     pasien.ca = data['ca']
     pasien.thal = data['thal']
-    pasien.prediction = prediction
-    pasien.probability = probability
+    pasien.prediction = prediksi_final
+    pasien.probability = probabilitas_sakit
     pasien.status = "Selesai"
     
     db.session.commit()
 
     return jsonify({
         "status": "success",
-        "prediction": prediction,
-        "probability": probability
+        "prediction": prediksi_final,
+        "probability": probabilitas_sakit
     })
 
 if __name__ == '__main__':

@@ -3,12 +3,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 export default function DokterPage() {
-  // State Pencarian Tiket
   const [ticketInput, setTicketInput] = useState('');
   const [patientData, setPatientData] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // State Prediksi ML
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -24,7 +22,6 @@ export default function DokterPage() {
     setFormData({ ...formData, [name]: name === 'model_choice' ? value : Number(value) });
   };
 
-  // 1. Fungsi Menarik Data Pasien dari Database
   const handleSearchTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketInput) return;
@@ -48,7 +45,6 @@ export default function DokterPage() {
     }
   };
 
-  // 2. Fungsi Mengirim 13 Parameter Klinis ke ML
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!patientData) {
@@ -58,11 +54,7 @@ export default function DokterPage() {
 
     setLoading(true);
     try {
-      const payload = {
-        ...formData,
-        ticket_code: patientData.ticket_code
-      };
-
+      const payload = { ...formData, ticket_code: patientData.ticket_code };
       const res = await fetch('http://localhost:5000/api/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,6 +67,13 @@ export default function DokterPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getUrgencyStyle = (gejalaText: string) => {
+    if (!gejalaText) return "text-gray-500 bg-gray-50 border-gray-200";
+    if (gejalaText.includes("URGENSI TINGGI")) return "text-red-700 bg-red-50 border-red-200"; 
+    if (gejalaText.includes("URGENSI MENENGAH")) return "text-yellow-700 bg-yellow-50 border-yellow-200";
+    return "text-green-700 bg-green-50 border-green-200";
   };
 
   const mapData = {
@@ -111,9 +110,7 @@ export default function DokterPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:block">
           
-          {/* Panel Kiri (Pencarian & Form) */}
           <div className="lg:col-span-2 space-y-6 print:hidden">
-            
             {/* 1. KOTAK PENCARIAN TIKET */}
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
               <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
@@ -121,14 +118,7 @@ export default function DokterPage() {
                 Tarik Data Skrining Pasien
               </h2>
               <form onSubmit={handleSearchTicket} className="flex gap-4">
-                <input 
-                  type="text" 
-                  value={ticketInput}
-                  onChange={(e) => setTicketInput(e.target.value)}
-                  placeholder="Masukkan ID (Contoh: CG-1234)" 
-                  className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none uppercase font-mono tracking-widest"
-                  required 
-                />
+                <input type="text" value={ticketInput} onChange={(e) => setTicketInput(e.target.value)} placeholder="Masukkan ID (Contoh: CG-1234)" className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none uppercase font-mono tracking-widest" required />
                 <button type="submit" disabled={searchLoading} className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 rounded-2xl transition-all disabled:opacity-70">
                   {searchLoading ? 'Mencari...' : 'Cari Data'}
                 </button>
@@ -155,9 +145,9 @@ export default function DokterPage() {
                   
                   <div className="mt-4 pt-4 border-t border-slate-100">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Hasil Ekstraksi Fitur (NLP Sastrawi)</p>
-                    <p className={`text-sm font-bold uppercase ${patientData.gejala_nlp !== 'Negatif' ? 'text-red-600' : 'text-teal-600'}`}>
+                    <div className={`p-3 border rounded-md font-bold text-sm ${getUrgencyStyle(patientData.gejala_nlp)}`}>
                       {patientData.gejala_nlp}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -172,7 +162,6 @@ export default function DokterPage() {
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                  {/* Baris 1: Numerik */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Usia</label>
                     <input type="number" name="age" value={formData.age} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm" required />
@@ -185,8 +174,6 @@ export default function DokterPage() {
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Kolesterol (mg/dl)</label>
                     <input type="number" name="chol" value={formData.chol} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm" required />
                   </div>
-
-                  {/* Baris 2 */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Detak Jantung Maks</label>
                     <input type="number" name="thalach" value={formData.thalach} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm" required />
@@ -202,8 +189,6 @@ export default function DokterPage() {
                       <option value={0}>Perempuan</option>
                     </select>
                   </div>
-
-                  {/* Baris 3 */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nyeri Dada (CP)</label>
                     <select name="cp" value={formData.cp} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm">
@@ -228,8 +213,6 @@ export default function DokterPage() {
                       <option value={2}>Hipertrofi LV</option>
                     </select>
                   </div>
-
-                  {/* Baris 4 */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Angina Olahraga</label>
                     <select name="exang" value={formData.exang} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm">
@@ -249,8 +232,6 @@ export default function DokterPage() {
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pembuluh (CA)</label>
                     <input type="number" min="0" max="4" name="ca" value={formData.ca} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm" required />
                   </div>
-
-                  {/* Baris 5 */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Thalassemia</label>
                     <select name="thal" value={formData.thal} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm">
@@ -279,18 +260,15 @@ export default function DokterPage() {
             </div>
           </div>
 
-          {/* Panel Kanan (Hasil & Print Layout) */}
           <div className="lg:col-span-1 print:w-full print:block">
             {result && patientData ? (
               <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 print:shadow-none print:border-none print:p-0">
                 
-                {/* Header Print (Berisi Nama Pasien Asli) */}
                 <div className="hidden print:block mb-8 text-center border-b-2 border-slate-800 pb-4">
                   <h1 className="text-2xl font-bold text-slate-900">Laporan Evaluasi Medis Hibrida</h1>
                   <p className="text-slate-500 text-sm mt-1">Sistem Skrining CardioGuard AI</p>
                 </div>
 
-                {/* TABEL DATA PRINT */}
                 <div className="hidden print:block mb-8">
                   <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-300 pb-2 mb-4">A. Informasi Pasien & Skrining Awal (NLP)</h2>
                   <div className="text-sm text-slate-700 mb-6 space-y-2">
@@ -300,7 +278,10 @@ export default function DokterPage() {
                     <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
                       <p className="text-xs text-slate-500 mb-1">Keluhan Subjektif Pasien:</p>
                       <p className="italic">"{patientData.keluhan_teks}"</p>
-                      <p className="mt-2 font-bold text-red-600">Ekstraksi NLP: {patientData.gejala_nlp}</p>
+                      {/* --- PERUBAHAN DISINI: Warna di dokumen Print --- */}
+                      <p className={`mt-2 font-bold ${patientData.gejala_nlp.includes("TINGGI") ? "text-red-600" : patientData.gejala_nlp.includes("MENENGAH") ? "text-yellow-600" : "text-teal-600"}`}>
+                        Ekstraksi NLP: {patientData.gejala_nlp}
+                      </p>
                     </div>
                   </div>
 
@@ -352,12 +333,8 @@ export default function DokterPage() {
                   )}
                 </div>
 
-                {/* Tombol Print */}
                 <div className="mt-10 pt-6 border-t border-slate-100 print:hidden">
-                  <button 
-                    onClick={() => window.print()} 
-                    className="w-full flex justify-center items-center bg-slate-900 hover:bg-slate-800 text-white font-medium py-4 rounded-xl transition-colors shadow-sm"
-                  >
+                  <button onClick={() => window.print()} className="w-full flex justify-center items-center bg-slate-900 hover:bg-slate-800 text-white font-medium py-4 rounded-xl transition-colors shadow-sm">
                     <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                     Cetak Rekam Medis PDF
                   </button>
